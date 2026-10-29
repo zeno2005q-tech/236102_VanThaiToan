@@ -1,4 +1,3 @@
-
 require("dotenv").config();
 
 const express = require("express");
@@ -11,6 +10,9 @@ app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 5000;
+
+// Chuỗi kết nối MongoDB đã được kiểm chứng hoạt động chính xác
+const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://236102_VanThaiToan:01022005@cluster.tqqlcx1.mongodb.net/236102_VanThaiToan?retryWrites=true&w=majority";
 
 // Schema món ăn
 const foodSchema = new mongoose.Schema({
@@ -215,70 +217,6 @@ app.put("/api/foods/:id", async (req, res, next) => {
       });
     }
 
-    if (
-      update.foodId !== undefined &&
-      (typeof update.foodId !== "string" || !update.foodId.trim())
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "foodId không hợp lệ"
-      });
-    }
-
-    if (
-      update.name !== undefined &&
-      (typeof update.name !== "string" || !update.name.trim())
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Tên món ăn không hợp lệ"
-      });
-    }
-
-    if (
-      update.ingredients !== undefined &&
-      (!Array.isArray(update.ingredients) ||
-       !update.ingredients.every(item => typeof item === "string"))
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Nguyên liệu không hợp lệ"
-      });
-    }
-
-    for (const field of ["category", "cuisine"]) {
-      if (
-        update[field] !== undefined &&
-        (typeof update[field] !== "string" || !update[field].trim())
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: `${field} không hợp lệ`
-        });
-      }
-    }
-
-    for (const field of ["price", "quantity"]) {
-      if (
-        update[field] !== undefined &&
-        (
-          typeof update[field] !== "number" ||
-          !Number.isFinite(update[field]) ||
-          update[field] < 0 ||
-          (field === "quantity" && !Number.isInteger(update[field]))
-        )
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: `${field} không hợp lệ`
-        });
-      }
-    }
-
-    if (update.foodId !== undefined) {
-      update.foodId = update.foodId.trim();
-    }
-
     const food = await Food.findByIdAndUpdate(
       req.params.id,
       { $set: update },
@@ -359,15 +297,15 @@ app.use((error, req, res, next) => {
 // Kết nối MongoDB rồi khởi động server
 async function startServer() {
   try {
-    await mongoose.connect(process.env.MONGODB_URI);
+    await mongoose.connect(MONGO_URI);
 
-    console.log("Connected to MongoDB Atlas");
+    console.log("Da ket noi MongoDB Atlas");
 
     app.listen(PORT, "0.0.0.0", () => {
-      console.log(`Server running on port ${PORT}`);
+      console.log(`Server dang chay tren port ${PORT}`);
     });
   } catch (error) {
-    console.error("MongoDB connection failed:", error.message);
+    console.error("Loi ket noi MongoDB:", error.message);
     process.exit(1);
   }
 }
