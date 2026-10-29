@@ -10,3 +10,4 @@
 ## Hướng dẫn cài đặt & Chạy cục bộ
 1. Backend: `cd backend && npm install && npm start`
 2. Frontend: `cd frontend && npm install && npm start`
+- Docker Backend: https://hub.docker.com/r/236102vanthaitoan/backend
