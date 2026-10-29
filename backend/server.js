@@ -12,7 +12,7 @@ app.use(express.json());
 const PORT = process.env.PORT || 5000;
 
 // Chuỗi kết nối MongoDB đã được kiểm chứng hoạt động chính xác
-const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://236102_VanThaiToan:01022005@cluster.tqqlcx1.mongodb.net/236102_VanThaiToan?retryWrites=true&w=majority";
+const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://236102_VanThaiToan:vtt2005qQ...@cluster.tqqlcx1.mongodb.net/236102_VanThaiToan?retryWrites=true&w=majority";
 
 // Schema món ăn
 const foodSchema = new mongoose.Schema({
