@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './App.css';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+// Đường dẫn tương đối /api để Nginx proxy sang backend trong Docker/Codespaces
+const API_URL = process.env.REACT_APP_API_URL || '/api';
 
 function App() {
   const [foods, setFoods] = useState([]);
@@ -16,15 +17,20 @@ function App() {
   });
   const [editingId, setEditingId] = useState(null);
 
-  // 1. Lấy danh sách món ăn (có hỗ trợ tìm kiếm)
+  // 1. Lấy danh sách món ăn
   const fetchFoods = async (keyword = '') => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API_URL}/foods${keyword ? `?search=${keyword}` : ''}`);
-      setFoods(res.data);
+      const res = await axios.get(`${API_URL}/foods${keyword ? `?search=${encodeURIComponent(keyword)}` : ''}`);
+      
+      // ĐÃ SỬA: Bóc tách đúng mảng món ăn từ res.data.data
+      const foodArray = Array.isArray(res.data?.data) ? res.data.data : (Array.isArray(res.data) ? res.data : []);
+      setFoods(foodArray);
       setError('');
     } catch (err) {
+      console.error("Lỗi fetch API:", err);
       setError('Lỗi kết nối đến Backend API!');
+      setFoods([]);
     } finally {
       setLoading(false);
     }
@@ -48,13 +54,12 @@ function App() {
   // 4. Gửi form (Thêm mới hoặc Cập nhật)
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // Xử lý kiểu dữ liệu trước khi gửi
     const payload = {
       ...formData,
       price: Number(formData.price),
       quantity: Number(formData.quantity),
       ingredients: typeof formData.ingredients === 'string' 
-        ? formData.ingredients.split(',').map(i => i.trim()) 
+        ? formData.ingredients.split(',').map(i => i.trim()).filter(Boolean)
         : formData.ingredients
     };
 
@@ -67,7 +72,7 @@ function App() {
         alert('Thêm món ăn mới thành công!');
       }
       resetForm();
-      fetchFoods(); // Tải lại danh sách
+      fetchFoods();
     } catch (err) {
       alert(err.response?.data?.message || 'Có lỗi xảy ra khi lưu món ăn!');
     }
@@ -77,13 +82,13 @@ function App() {
   const handleEdit = (food) => {
     setEditingId(food._id);
     setFormData({
-      foodId: food.foodId,
-      name: food.name,
-      category: food.category,
-      cuisine: food.cuisine,
-      ingredients: food.ingredients.join(', '),
-      price: food.price,
-      quantity: food.quantity,
+      foodId: food.foodId || '',
+      name: food.name || '',
+      category: food.category || '',
+      cuisine: food.cuisine || '',
+      ingredients: Array.isArray(food.ingredients) ? food.ingredients.join(', ') : '',
+      price: food.price ?? '',
+      quantity: food.quantity ?? '',
       description: food.description || '',
       imageUrl: food.imageUrl || ''
     });
@@ -180,7 +185,7 @@ function App() {
               <td style={{ fontWeight: 'bold' }}>{item.name}</td>
               <td>{item.category}</td>
               <td>{item.cuisine}</td>
-              <td>{item.price.toLocaleString()}</td>
+              <td>{Number(item.price).toLocaleString('vi-VN')}</td>
               <td>{item.quantity}</td>
               <td>
                 <button onClick={() => handleEdit(item)} style={{ marginRight: '5px', cursor: 'pointer' }}>Sửa</button>

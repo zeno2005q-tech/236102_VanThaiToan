@@ -1,32 +1,28 @@
-
 import axios from "axios";
 
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
-  headers: {
-    "Content-Type": "application/json",
-  },
+const API = axios.create({
+  baseURL: "",
 });
 
-export async function getFoods(search = "") {
-  const response = await api.get("/foods", {
-    params: search ? { search } : {},
-  });
+export const getFoods = async (search = "") => {
+  const response = await API.get(
+    `/api/foods${search ? `?search=${encodeURIComponent(search)}` : ""}`
+  );
+  // Trả về trực tiếp mảng món ăn bên trong response.data.data
+  return response.data.data;
+};
 
+export const createFood = async (foodData) => {
+  const response = await API.post("/api/foods", foodData);
   return response.data;
-}
+};
 
-export async function createFood(food) {
-  const response = await api.post("/foods", food);
+export const updateFood = async (id, foodData) => {
+  const response = await API.put(`/api/foods/${id}`, foodData);
   return response.data;
-}
+};
 
-export async function updateFood(id, food) {
-  const response = await api.put(`/foods/${id}`, food);
+export const deleteFood = async (id) => {
+  const response = await API.delete(`/api/foods/${id}`);
   return response.data;
-}
-
-export async function deleteFood(id) {
-  const response = await api.delete(`/foods/${id}`);
-  return response.data;
-}
+};

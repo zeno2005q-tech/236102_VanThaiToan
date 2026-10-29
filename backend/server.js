@@ -1,135 +1,133 @@
-require("dotenv").config();
 
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+require("dotenv").config();
+
+const Food = require("./models/Food");
 
 const app = express();
-
-app.use(cors());
-app.use(express.json());
-
 const PORT = process.env.PORT || 5000;
 
-// Chuỗi kết nối MongoDB đã được kiểm chứng hoạt động chính xác
-const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://236102_VanThaiToan:vtt2005qQ...@cluster.tqqlcx1.mongodb.net/236102_VanThaiToan?retryWrites=true&w=majority";
+// ==================== MIDDLEWARE ====================
 
-// Schema món ăn
-const foodSchema = new mongoose.Schema({
-  foodId: {
-    type: String,
-    required: true,
-    unique: true,
-    trim: true
-  },
-  name: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  category: {
-    type: String,
-    required: true
-  },
-  cuisine: {
-    type: String,
-    required: true
-  },
-  ingredients: {
-    type: [String],
-    default: []
-  },
-  price: {
-    type: Number,
-    required: true,
-    min: 0
-  },
-  quantity: {
-    type: Number,
-    required: true,
-    min: 0
-  },
-  description: {
-    type: String,
-    default: ""
-  },
-  imageUrl: {
-    type: String,
-    default: ""
-  }
-});
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL
+      ? process.env.FRONTEND_URL.split(",").map((url) => url.trim())
+      : true,
+  })
+);
 
-const Food = mongoose.model("Food", foodSchema, "foods");
+app.use(express.json());
 
-// Kiểm tra trạng thái backend
+// Chuẩn hóa tiếng Việt để tìm kiếm không phân biệt dấu
+function normalizeVietnamese(text) {
+  return String(text)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase();
+}
+
+// ==================== HEALTH CHECK ====================
+
+// Kiểm tra trạng thái backend và MongoDB
 app.get("/health", (req, res) => {
-  res.json({
+  res.status(200).json({
     success: true,
-    message: "Backend is running",
+    message: "Food Management API is running",
     database:
       mongoose.connection.readyState === 1
         ? "connected"
-        : "disconnected"
+        : "disconnected",
   });
 });
 
-// GET: Lấy danh sách và tìm kiếm món ăn
-app.get("/api/foods", async (req, res, next) => {
+// ==================== GET ALL / SEARCH FOODS ====================
+
+// Lấy danh sách món ăn và tìm kiếm theo tên, loại, vùng miền
+app.get("/api/foods", async (req, res) => {
   try {
-    const search = (req.query.search || "").trim();
+    const search =
+      typeof req.query.search === "string"
+        ? req.query.search.trim()
+        : "";
 
-    const filter = search
-      ? {
-          $or: [
-            { name: { $regex: search, $options: "i" } },
-            { category: { $regex: search, $options: "i" } },
-            { cuisine: { $regex: search, $options: "i" } }
-          ]
-        }
-      : {};
+    let foods;
 
-    const foods = await Food.find(filter);
+    if (search) {
+      const keyword = normalizeVietnamese(search);
 
-    res.json({
+      // Lấy danh sách món ăn từ MongoDB
+      const allFoods = await Food.find().sort({ createdAt: -1 });
+
+      // Tìm kiếm không phân biệt dấu tiếng Việt
+      foods = allFoods.filter((food) => {
+        const fields = [
+          food.name,
+          food.category,
+          food.cuisine,
+        ];
+
+        return fields.some((value) => {
+          if (typeof value !== "string") {
+            return false;
+          }
+
+          return normalizeVietnamese(value).includes(keyword);
+        });
+      });
+    } else {
+      foods = await Food.find().sort({ createdAt: -1 });
+    }
+
+    return res.status(200).json({
       success: true,
       count: foods.length,
-      data: foods
+      data: foods,
     });
   } catch (error) {
-    next(error);
+    console.error("Lỗi lấy danh sách món ăn:", error.message);
+
+    return res.status(500).json({
+      success: false,
+      message: "Không thể lấy danh sách món ăn",
+    });
   }
 });
 
-// GET: Xem chi tiết một món ăn
-app.get("/api/foods/:id", async (req, res, next) => {
-  try {
-    if (!mongoose.isValidObjectId(req.params.id)) {
-      return res.status(400).json({
-        success: false,
-        message: "ID không hợp lệ"
-      });
-    }
+// ==================== GET FOOD BY ID ====================
 
+// Xem chi tiết một món ăn theo MongoDB ID
+app.get("/api/foods/:id", async (req, res) => {
+  try {
     const food = await Food.findById(req.params.id);
 
     if (!food) {
       return res.status(404).json({
         success: false,
-        message: "Không tìm thấy món ăn"
+        message: "Không tìm thấy món ăn",
       });
     }
 
-    res.json({
+    return res.status(200).json({
       success: true,
-      data: food
+      data: food,
     });
   } catch (error) {
-    next(error);
+    return res.status(400).json({
+      success: false,
+      message: "ID món ăn không hợp lệ",
+    });
   }
 });
 
-// POST: Thêm món ăn
-app.post("/api/foods", async (req, res, next) => {
+// ==================== CREATE FOOD ====================
+
+// Thêm món ăn mới
+app.post("/api/foods", async (req, res) => {
   try {
     const {
       foodId,
@@ -140,27 +138,46 @@ app.post("/api/foods", async (req, res, next) => {
       price,
       quantity,
       description,
-      imageUrl
+      imageUrl,
     } = req.body;
 
+    // Kiểm tra các trường bắt buộc
     if (
-      typeof foodId !== "string" || !foodId.trim() ||
-      typeof name !== "string" || !name.trim() ||
-      typeof category !== "string" || !category.trim() ||
-      typeof cuisine !== "string" || !cuisine.trim() ||
-      !Array.isArray(ingredients) ||
-      !ingredients.every(item => typeof item === "string") ||
-      typeof price !== "number" || !Number.isFinite(price) || price < 0 ||
-      typeof quantity !== "number" || !Number.isInteger(quantity) || quantity < 0
+      typeof foodId !== "string" ||
+      !foodId.trim() ||
+      typeof name !== "string" ||
+      !name.trim() ||
+      typeof category !== "string" ||
+      !category.trim() ||
+      typeof cuisine !== "string" ||
+      !cuisine.trim() ||
+      price === undefined ||
+      quantity === undefined
     ) {
       return res.status(400).json({
         success: false,
-        message: "Dữ liệu món ăn không hợp lệ"
+        message:
+          "Vui lòng nhập mã, tên, loại, ẩm thực, giá và số lượng hợp lệ",
       });
     }
 
+    // Kiểm tra mã món ăn đã tồn tại chưa
+    const normalizedFoodId = foodId.trim();
+
+    const duplicated = await Food.findOne({
+      foodId: normalizedFoodId,
+    });
+
+    if (duplicated) {
+      return res.status(409).json({
+        success: false,
+        message: "Mã món ăn đã tồn tại",
+      });
+    }
+
+    // Tạo món ăn mới
     const food = await Food.create({
-      foodId: foodId.trim(),
+      foodId: normalizedFoodId,
       name: name.trim(),
       category: category.trim(),
       cuisine: cuisine.trim(),
@@ -168,28 +185,47 @@ app.post("/api/foods", async (req, res, next) => {
       price,
       quantity,
       description,
-      imageUrl
+      imageUrl,
     });
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
-      data: food
+      message: "Thêm món ăn thành công",
+      data: food,
     });
   } catch (error) {
-    next(error);
-  }
-});
+    console.error("Lỗi thêm món ăn:", error.message);
 
-// PUT: Cập nhật món ăn
-app.put("/api/foods/:id", async (req, res, next) => {
-  try {
-    if (!mongoose.isValidObjectId(req.params.id)) {
-      return res.status(400).json({
+    if (error.code === 11000) {
+      return res.status(409).json({
         success: false,
-        message: "ID không hợp lệ"
+        message: "Mã món ăn đã tồn tại",
       });
     }
 
+    if (
+      error.name === "ValidationError" ||
+      error.name === "CastError"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Dữ liệu món ăn không hợp lệ",
+        error: error.message,
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: "Lỗi khi thêm món ăn",
+    });
+  }
+});
+
+// ==================== UPDATE FOOD ====================
+
+// Cập nhật thông tin món ăn
+app.put("/api/foods/:id", async (req, res) => {
+  try {
     const allowedFields = [
       "foodId",
       "name",
@@ -199,113 +235,164 @@ app.put("/api/foods/:id", async (req, res, next) => {
       "price",
       "quantity",
       "description",
-      "imageUrl"
+      "imageUrl",
     ];
 
-    const update = {};
+    const updates = {};
 
+    // Chỉ cho phép cập nhật các trường được định nghĩa
     for (const field of allowedFields) {
       if (req.body[field] !== undefined) {
-        update[field] = req.body[field];
+        updates[field] = req.body[field];
       }
     }
 
-    if (Object.keys(update).length === 0) {
+    if (Object.keys(updates).length === 0) {
       return res.status(400).json({
         success: false,
-        message: "Không có dữ liệu cập nhật"
+        message: "Không có dữ liệu để cập nhật",
       });
     }
 
+    // Chuẩn hóa và kiểm tra mã món ăn nếu được cập nhật
+    if (updates.foodId !== undefined) {
+      if (
+        typeof updates.foodId !== "string" ||
+        !updates.foodId.trim()
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Mã món ăn không hợp lệ",
+        });
+      }
+
+      updates.foodId = updates.foodId.trim();
+
+      const duplicated = await Food.findOne({
+        foodId: updates.foodId,
+        _id: { $ne: req.params.id },
+      });
+
+      if (duplicated) {
+        return res.status(409).json({
+          success: false,
+          message: "Mã món ăn đã tồn tại",
+        });
+      }
+    }
+
+    // Cập nhật và kiểm tra dữ liệu bằng schema Mongoose
     const food = await Food.findByIdAndUpdate(
       req.params.id,
-      { $set: update },
-      { new: true, runValidators: true }
+      updates,
+      {
+        new: true,
+        runValidators: true,
+      }
     );
 
     if (!food) {
       return res.status(404).json({
         success: false,
-        message: "Không tìm thấy món ăn"
+        message: "Không tìm thấy món ăn",
       });
     }
 
-    res.json({
+    return res.status(200).json({
       success: true,
-      data: food
+      message: "Cập nhật món ăn thành công",
+      data: food,
     });
   } catch (error) {
-    next(error);
+    console.error("Lỗi cập nhật món ăn:", error.message);
+
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: "Mã món ăn đã tồn tại",
+      });
+    }
+
+    if (
+      error.name === "ValidationError" ||
+      error.name === "CastError"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Dữ liệu cập nhật không hợp lệ",
+        error: error.message,
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: "Lỗi khi cập nhật món ăn",
+    });
   }
 });
 
-// DELETE: Xóa món ăn
-app.delete("/api/foods/:id", async (req, res, next) => {
-  try {
-    if (!mongoose.isValidObjectId(req.params.id)) {
-      return res.status(400).json({
-        success: false,
-        message: "ID không hợp lệ"
-      });
-    }
+// ==================== DELETE FOOD ====================
 
+// Xóa món ăn
+app.delete("/api/foods/:id", async (req, res) => {
+  try {
     const food = await Food.findByIdAndDelete(req.params.id);
 
     if (!food) {
       return res.status(404).json({
         success: false,
-        message: "Không tìm thấy món ăn"
+        message: "Không tìm thấy món ăn",
       });
     }
 
-    res.json({
+    return res.status(200).json({
       success: true,
-      message: "Đã xóa món ăn"
+      message: "Xóa món ăn thành công",
     });
   } catch (error) {
-    next(error);
+    return res.status(400).json({
+      success: false,
+      message: "ID món ăn không hợp lệ",
+    });
   }
 });
 
-// Xử lý lỗi chung
-app.use((error, req, res, next) => {
-  console.error(error);
+// ==================== 404 HANDLER ====================
 
-  if (error.code === 11000) {
-    return res.status(409).json({
-      success: false,
-      message: "Mã món ăn foodId đã tồn tại"
-    });
-  }
-
-  if (
-    error.name === "ValidationError" ||
-    error.name === "CastError"
-  ) {
-    return res.status(400).json({
-      success: false,
-      message: "Dữ liệu không hợp lệ"
-    });
-  }
-
-  res.status(500).json({
+// Xử lý endpoint không tồn tại
+app.use((req, res) => {
+  res.status(404).json({
     success: false,
-    message: "Lỗi máy chủ hoặc cơ sở dữ liệu"
+    message: "Endpoint không tồn tại",
   });
 });
 
-// Kết nối MongoDB rồi khởi động server
+// ==================== START SERVER ====================
+
+// Kết nối MongoDB trước khi khởi động backend
 async function startServer() {
   try {
-    await mongoose.connect(MONGO_URI);
+    if (!process.env.MONGODB_URI) {
+      throw new Error(
+        "Chưa cấu hình biến môi trường MONGODB_URI"
+      );
+    }
 
-    console.log("Da ket noi MongoDB Atlas");
+    await mongoose.connect(process.env.MONGODB_URI, {
+      serverSelectionTimeoutMS: 10000,
+    });
+
+    console.log("MongoDB connected successfully");
 
     app.listen(PORT, "0.0.0.0", () => {
-      console.log(`Server dang chay tren port ${PORT}`);
+      console.log(`Backend running on port ${PORT}`);
     });
   } catch (error) {
-    console.error("Loi ket noi MongoDB:", error.message);
+    console.error(
+      "Cannot start backend:",
+      error.message
+    );
+
     process.exit(1);
   }
 }

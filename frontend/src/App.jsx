@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import {
   getFoods,
@@ -35,12 +34,14 @@ function App() {
     try {
       const result = await getFoods(keyword);
 
-      // Hỗ trợ API trả về mảng hoặc object chứa data
+      // Bóc tách an toàn cho tất cả dạng cấu trúc JSON (Axios, Fetch, Direct Array, Nested Data)
       const foodList = Array.isArray(result)
         ? result
         : Array.isArray(result?.data)
           ? result.data
-          : [];
+          : Array.isArray(result?.data?.data)
+            ? result.data.data
+            : [];
 
       setFoods(foodList);
       setMessage("");
@@ -83,10 +84,9 @@ function App() {
 
     const food = {
       ...form,
-      ingredients: form.ingredients
-        .split(",")
-        .map((item) => item.trim())
-        .filter(Boolean),
+      ingredients: typeof form.ingredients === "string"
+        ? form.ingredients.split(",").map((item) => item.trim()).filter(Boolean)
+        : form.ingredients,
       price: Number(form.price),
       quantity: Number(form.quantity),
     };
@@ -156,7 +156,7 @@ function App() {
     <main className="container">
       <header className="hero">
         <p className="eyebrow">FOOD MANAGEMENT SYSTEM</p>
-        <h1>Quản lý món ăn</h1>
+        <h1>Quản lý món ăn - MSSV: 236102 - Văn Thái Toàn</h1>
         <p>Quản lý thực đơn của bạn trong một giao diện duy nhất.</p>
       </header>
 
