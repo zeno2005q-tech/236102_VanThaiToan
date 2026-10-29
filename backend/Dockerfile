@@ -1,19 +1,19 @@
-# Stage 1: Build Frontend React
+# Stage 1: Build Frontend React từ thư mục gốc cha
 FROM node:18-alpine AS frontend-builder
 WORKDIR /app/frontend
-COPY frontend/package*.json ./
+COPY ../frontend/package*.json ./
 RUN npm install
-COPY frontend/ ./
+COPY ../frontend/ ./
 RUN npm run build
 
 # Stage 2: Chạy Backend Node.js
 FROM node:18-alpine
 WORKDIR /app/backend
-COPY backend/package*.json ./
+COPY package*.json ./
 RUN npm install --production
-COPY backend/ ./
+COPY . .
 
-# Copy thư mục frontend build sang backend
+# Copy thư mục build từ stage 1 vào backend
 COPY --from=frontend-builder /app/frontend/build /app/frontend/build
 
 EXPOSE 5000
