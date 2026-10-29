@@ -4,7 +4,7 @@ services:
     container_name: food_backend
     network_mode: "host"
     environment:
-      - MONGODB_URI=mongodb://236102_VanThaiToan:vtt2005qQ@ac-mrbk9xr-shard-00-00.tqqlcx1.mongodb.net:27017,ac-mrbk9xr-shard-00-01.tqqlcx1.mongodb.net:27017,ac-mrbk9xr-shard-00-02.tqqlcx1.mongodb.net:27017/236102_VanThaiToan?ssl=true&replicaSet=atlas-7fpqe2-shard-0&authSource=admin&retryWrites=true&w=majority
+      - MONGODB_URI=mongodb://236102_VanThaiToan:vtt2005qQ...@ac-mrbk9xr-shard-00-00.tqqlcx1.mongodb.net:27017,ac-mrbk9xr-shard-00-01.tqqlcx1.mongodb.net:27017,ac-mrbk9xr-shard-00-02.tqqlcx1.mongodb.net:27017/236102_VanThaiToan?ssl=true&replicaSet=atlas-7fpqe2-shard-0&authSource=admin&retryWrites=true&w=majority
 
   frontend:
     build: ./frontend
