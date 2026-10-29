@@ -346,12 +346,11 @@ app.delete("/api/foods/:id", async (req, res) => {
 
 // ==================== SERVE FRONTEND BUILD ====================
 
-// Serve static files từ thư mục build của React Frontend
+// Phục vụ các file tĩnh trong thư mục build của React Frontend
 app.use(express.static(path.join(__dirname, "../frontend/build")));
 
-// Trả về index.html cho các route giao diện (dùng cú pháp /*splat chuẩn Express)
+// Trả về index.html cho các đường dẫn giao diện (Sử dụng cú pháp /*splat chuẩn Express)
 app.get("/*splat", (req, res, next) => {
-  // Nếu là request API thì cho đi tiếp xuống 404 handler
   if (req.path.startsWith("/api/")) {
     return next();
   }
@@ -360,7 +359,7 @@ app.get("/*splat", (req, res, next) => {
 
 // ==================== 404 API HANDLER ====================
 
-// Đặt cuối cùng để bắt các API Endpoint không tồn tại
+// Xử lý các yêu cầu API không tồn tại
 app.use((req, res) => {
   res.status(404).json({
     success: false,
