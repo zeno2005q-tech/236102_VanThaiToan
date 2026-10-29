@@ -1,7 +1,7 @@
-
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const path = require("path");
 require("dotenv").config();
 
 const Food = require("./models/Food");
@@ -47,7 +47,6 @@ app.get("/health", (req, res) => {
 
 // ==================== GET ALL / SEARCH FOODS ====================
 
-// Lấy danh sách món ăn và tìm kiếm theo tên, loại, vùng miền
 app.get("/api/foods", async (req, res) => {
   try {
     const search =
@@ -60,10 +59,8 @@ app.get("/api/foods", async (req, res) => {
     if (search) {
       const keyword = normalizeVietnamese(search);
 
-      // Lấy danh sách món ăn từ MongoDB
       const allFoods = await Food.find().sort({ createdAt: -1 });
 
-      // Tìm kiếm không phân biệt dấu tiếng Việt
       foods = allFoods.filter((food) => {
         const fields = [
           food.name,
@@ -100,7 +97,6 @@ app.get("/api/foods", async (req, res) => {
 
 // ==================== GET FOOD BY ID ====================
 
-// Xem chi tiết một món ăn theo MongoDB ID
 app.get("/api/foods/:id", async (req, res) => {
   try {
     const food = await Food.findById(req.params.id);
@@ -126,7 +122,6 @@ app.get("/api/foods/:id", async (req, res) => {
 
 // ==================== CREATE FOOD ====================
 
-// Thêm món ăn mới
 app.post("/api/foods", async (req, res) => {
   try {
     const {
@@ -141,7 +136,6 @@ app.post("/api/foods", async (req, res) => {
       imageUrl,
     } = req.body;
 
-    // Kiểm tra các trường bắt buộc
     if (
       typeof foodId !== "string" ||
       !foodId.trim() ||
@@ -161,7 +155,6 @@ app.post("/api/foods", async (req, res) => {
       });
     }
 
-    // Kiểm tra mã món ăn đã tồn tại chưa
     const normalizedFoodId = foodId.trim();
 
     const duplicated = await Food.findOne({
@@ -175,7 +168,6 @@ app.post("/api/foods", async (req, res) => {
       });
     }
 
-    // Tạo món ăn mới
     const food = await Food.create({
       foodId: normalizedFoodId,
       name: name.trim(),
@@ -223,7 +215,6 @@ app.post("/api/foods", async (req, res) => {
 
 // ==================== UPDATE FOOD ====================
 
-// Cập nhật thông tin món ăn
 app.put("/api/foods/:id", async (req, res) => {
   try {
     const allowedFields = [
@@ -240,7 +231,6 @@ app.put("/api/foods/:id", async (req, res) => {
 
     const updates = {};
 
-    // Chỉ cho phép cập nhật các trường được định nghĩa
     for (const field of allowedFields) {
       if (req.body[field] !== undefined) {
         updates[field] = req.body[field];
@@ -254,7 +244,6 @@ app.put("/api/foods/:id", async (req, res) => {
       });
     }
 
-    // Chuẩn hóa và kiểm tra mã món ăn nếu được cập nhật
     if (updates.foodId !== undefined) {
       if (
         typeof updates.foodId !== "string" ||
@@ -281,7 +270,6 @@ app.put("/api/foods/:id", async (req, res) => {
       }
     }
 
-    // Cập nhật và kiểm tra dữ liệu bằng schema Mongoose
     const food = await Food.findByIdAndUpdate(
       req.params.id,
       updates,
@@ -333,7 +321,6 @@ app.put("/api/foods/:id", async (req, res) => {
 
 // ==================== DELETE FOOD ====================
 
-// Xóa món ăn
 app.delete("/api/foods/:id", async (req, res) => {
   try {
     const food = await Food.findByIdAndDelete(req.params.id);
@@ -357,9 +344,23 @@ app.delete("/api/foods/:id", async (req, res) => {
   }
 });
 
-// ==================== 404 HANDLER ====================
+// ==================== SERVE FRONTEND BUILD ====================
 
-// Xử lý endpoint không tồn tại
+// Serve static files từ thư mục build của React Frontend
+app.use(express.static(path.join(__dirname, "../frontend/build")));
+
+// Trả về index.html cho các route giao diện (dùng cú pháp /*splat chuẩn Express)
+app.get("/*splat", (req, res, next) => {
+  // Nếu là request API thì cho đi tiếp xuống 404 handler
+  if (req.path.startsWith("/api/")) {
+    return next();
+  }
+  res.sendFile(path.join(__dirname, "../frontend/build/index.html"));
+});
+
+// ==================== 404 API HANDLER ====================
+
+// Đặt cuối cùng để bắt các API Endpoint không tồn tại
 app.use((req, res) => {
   res.status(404).json({
     success: false,
@@ -369,13 +370,10 @@ app.use((req, res) => {
 
 // ==================== START SERVER ====================
 
-// Kết nối MongoDB trước khi khởi động backend
 async function startServer() {
   try {
     if (!process.env.MONGODB_URI) {
-      throw new Error(
-        "Chưa cấu hình biến môi trường MONGODB_URI"
-      );
+      throw new Error("Chưa cấu hình biến môi trường MONGODB_URI");
     }
 
     await mongoose.connect(process.env.MONGODB_URI, {
@@ -383,24 +381,12 @@ async function startServer() {
     });
 
     console.log("MongoDB connected successfully");
-const path = require('path');
 
-// Phục vụ các tệp giao diện React từ thư mục build
-app.use(express.static(path.join(__dirname, '../frontend/build')));
-
-// Trả về index.html cho tất cả các đường dẫn giao diện
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../frontend/build/index.html'));
-});
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`Backend running on port ${PORT}`);
     });
   } catch (error) {
-    console.error(
-      "Cannot start backend:",
-      error.message
-    );
-
+    console.error("Cannot start backend:", error.message);
     process.exit(1);
   }
 }
