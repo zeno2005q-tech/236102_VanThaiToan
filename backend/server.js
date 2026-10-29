@@ -383,7 +383,15 @@ async function startServer() {
     });
 
     console.log("MongoDB connected successfully");
+const path = require('path');
 
+// Phục vụ các tệp giao diện React từ thư mục build
+app.use(express.static(path.join(__dirname, '../frontend/build')));
+
+// Trả về index.html cho tất cả các đường dẫn giao diện
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../frontend/build/index.html'));
+});
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`Backend running on port ${PORT}`);
     });
